@@ -1,24 +1,36 @@
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState } from "react";
+
+import Navbar from "./components/Navbar";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import InternshipDetails from "./pages/InternshipDetails";
+import Profile from "./pages/Profile";
+import Payment from "./pages/Payment";
 
 function App() {
+  const [darkMode, setDarkMode] = useState(false);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+
+      <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />
+
+      <Routes>
+
+        <Route path="/" element={<Home darkMode={darkMode} />} />
+        <Route path="/login" element={<Login darkMode={darkMode} />} />
+        <Route path="/register" element={<Register darkMode={darkMode} />} />
+        <Route path="/dashboard" element={<Dashboard darkMode={darkMode} />} />
+        <Route path="/internship/:id" element={<InternshipDetails darkMode={darkMode} />} />
+        <Route path="/profile" element={<Profile darkMode={darkMode} />} />
+        <Route path="/payment/:id" element={<Payment darkMode={darkMode} />} />
+
+      </Routes>
+
+    </BrowserRouter>
   );
 }
 
