@@ -1,12 +1,25 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { auth } from "../firebase/firebaseConfig";
 
-function Navbar({ darkMode, setDarkMode }) { // ✅ added props
+const ADMIN_EMAILS = ["admin@internhelp.com"];
+
+function Navbar({ darkMode, setDarkMode }) {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const unsubs = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubs();
+  }, []);
 
   const logout = () => {
     auth.signOut();
     window.location.href = "/";
   };
+
+  const isAdmin = currentUser && ADMIN_EMAILS.includes(currentUser.email);
 
   return (
     <nav
@@ -16,14 +29,13 @@ function Navbar({ darkMode, setDarkMode }) { // ✅ added props
         color: "white",
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center"
+        alignItems: "center",
+        flexWrap: "wrap"
       }}
     >
-
       <h2>InternHelp</h2>
 
-      <div style={{ display: "flex", gap: "15px", alignItems: "center" }}> {/* slight align fix */}
-
+      <div style={{ display: "flex", gap: "15px", alignItems: "center", flexWrap: "wrap" }}>
         <Link to="/" style={{ color: "white" }}>
           Home
         </Link>
@@ -32,30 +44,39 @@ function Navbar({ darkMode, setDarkMode }) { // ✅ added props
           Dashboard
         </Link>
 
-        {/* ✅ Added Profile */}
+        <Link to="/refer" style={{ color: "white" }}>
+          Refer & Earn
+        </Link>
+
+        {isAdmin && (
+          <Link to="/admin" style={{ color: "white" }}>
+            Admin Panel
+          </Link>
+        )}
+
         <Link to="/profile" style={{ color: "white" }}>
           Profile
         </Link>
 
-        <Link to="/login" style={{ color: "white" }}>
-          Login
-        </Link>
+        {!currentUser ? (
+          <>
+            <Link to="/login" style={{ color: "white" }}>
+              Login
+            </Link>
+            <Link to="/register" style={{ color: "white" }}>
+              Register
+            </Link>
+          </>
+        ) : (
+          <button onClick={logout} style={{ background: "transparent", border: "1px solid white", color: "white", borderRadius: "8px", cursor: "pointer" }}>
+            Logout
+          </button>
+        )}
 
-        <Link to="/register" style={{ color: "white" }}>
-          Register
-        </Link>
-
-        {/* ✅ Dark Mode Toggle */}
-        <button onClick={() => setDarkMode(!darkMode)}>
+        <button onClick={() => setDarkMode(!darkMode)} style={{ background: "transparent", border: "1px solid white", color: "white", borderRadius: "8px", cursor: "pointer" }}>
           {darkMode ? "☀️" : "🌙"}
         </button>
-
-        <button onClick={logout}>
-          Logout
-        </button>
-
       </div>
-
     </nav>
   );
 }

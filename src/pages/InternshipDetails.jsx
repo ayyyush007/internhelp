@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase/firebaseConfig";
 import {
-  addDoc,
   collection,
   query,
   where,
@@ -468,6 +467,7 @@ function InternshipDetails({ darkMode }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  const [course, setCourse] = useState(null);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [studentName, setStudentName] = useState("");
@@ -479,20 +479,20 @@ function InternshipDetails({ darkMode }) {
   useEffect(() => {
 
     const checkEnrollment = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-      const user = auth.currentUser;
-      if (!user) return;
+        // check enrollment
+        const q = query(
+          collection(db, "enrollments"),
+          where("userId", "==", user.uid),
+          where("internshipId", "==", id)
+        );
 
-      // check enrollment
-      const q = query(
-        collection(db, "enrollments"),
-        where("userId", "==", user.uid),
-        where("internshipId", "==", id)
-      );
+        const querySnapshot = await getDocs(q);
 
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
+        if (!querySnapshot.empty) {
 
         setAlreadyPurchased(true);
         const doc = querySnapshot.docs[0];
@@ -517,11 +517,36 @@ function InternshipDetails({ darkMode }) {
       if (userDoc.exists()) {
         setStudentName(userDoc.data().name);
       }
-
+    } catch (error) {
+      console.error("Internship details error:", error);
+      alert("Error loading internship details: " + (error.message || error));
+    }
     };
 
     checkEnrollment();
 
+  }, [id]);
+
+  useEffect(() => {
+    const loadCourse = async () => {
+      try {
+        const courseDoc = await getDoc(doc(db, "courses", id));
+        if (courseDoc.exists()) {
+          setCourse({ id: courseDoc.id, ...courseDoc.data() });
+        } else {
+          setCourse({
+            id,
+            title: internshipList[id] || "Unknown Internship",
+            icon: internshipIcons[id] || "📘",
+            description: internshipDescriptions[id] || "Description not found",
+            modules: modulesList[id] || []
+          });
+        }
+      } catch (error) {
+        console.error("Error loading course:", error);
+      }
+    };
+    loadCourse();
   }, [id]);
 
   const enrollUser = () => {
@@ -538,14 +563,29 @@ function InternshipDetails({ darkMode }) {
 
   };
 
+  const activeModules = (course?.modules || modulesList[id] || []).map((module, index) => ({
+    num: module.num != null ? module.num : index + 1,
+    icon: module.icon || "📘",
+    title: module.title || `Module ${index + 1}`,
+    duration: module.duration || "",
+    content: module.content || "",
+    ...module
+  }));
+
   const completeModule = async (moduleNum) => {
 
     if (!enrollmentDocId) return;
 
+    const targetModuleNum = moduleNum != null ? moduleNum : selectedModule?.num;
+    if (targetModuleNum == null || Number.isNaN(Number(targetModuleNum))) {
+      alert("Unable to mark module complete: module identifier is invalid.");
+      return;
+    }
+
     const newCompletedModules = new Set(completedModules);
-    newCompletedModules.add(moduleNum);
+    newCompletedModules.add(targetModuleNum);
     
-    const totalModules = modulesList[id].length;
+    const totalModules = activeModules.length || 1;
     const newProgress = Math.round((newCompletedModules.size / totalModules) * 100);
 
     setLoading(true);
@@ -582,7 +622,7 @@ function InternshipDetails({ darkMode }) {
 
   const generateCertificate = () => {
 
-    const courseName = internshipList[id];
+    const courseName = course?.title || internshipList[id];
 
     const certID =
       "CERT-" +
@@ -904,7 +944,7 @@ function InternshipDetails({ darkMode }) {
               fontSize: "60px",
               marginBottom: "20px"
             }}>
-              {internshipIcons[id]}
+              {course?.icon || internshipIcons[id] || "📘"}
             </div>
             <h1 style={{
               margin: "0 0 15px 0",
@@ -912,14 +952,14 @@ function InternshipDetails({ darkMode }) {
               fontWeight: "800",
               letterSpacing: "-0.5px"
             }}>
-              {internshipList[id]}
+              {course?.title || internshipList[id]}
             </h1>
             <p style={{
               margin: "0",
               fontSize: "15px",
               opacity: 0.9
             }}>
-              {internshipDescriptions[id]}
+              {course?.description || internshipDescriptions[id]}
             </p>
           </div>
 
@@ -949,7 +989,7 @@ function InternshipDetails({ darkMode }) {
                   fontWeight: "800",
                   color: "#667eea"
                 }}>
-                  {Math.round((completedModules.size / modulesList[id].length) * 100)}%
+                  {activeModules.length > 0 ? Math.round((completedModules.size / activeModules.length) * 100) : 0}%
                 </span>
               </div>
               <div style={{
@@ -961,7 +1001,7 @@ function InternshipDetails({ darkMode }) {
                 <div style={{
                   background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                   height: "100%",
-                  width: `${Math.round((completedModules.size / modulesList[id].length) * 100)}%`,
+                  width: `${activeModules.length > 0 ? Math.round((completedModules.size / activeModules.length) * 100) : 0}%`,
                   transition: "width 0.5s ease",
                   borderRadius: "10px"
                 }} />
@@ -994,7 +1034,7 @@ function InternshipDetails({ darkMode }) {
                 gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
                 gap: "20px"
               }}>
-                {modulesList[id]?.map((module, index) => (
+                {activeModules.map((module, index) => (
                   <div
                     key={index}
                     className="module-card"
@@ -1195,7 +1235,7 @@ function InternshipDetails({ darkMode }) {
               }}>
                 {isCompleted 
                   ? "🎉 Internship Completed - Certificate Ready!" 
-                  : `📖 Complete all ${modulesList[id].length} modules to finish this internship`}
+                  : `📖 Complete all ${activeModules.length} modules to finish this internship`}
               </div>
             )}
           </div>

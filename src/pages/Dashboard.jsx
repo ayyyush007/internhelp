@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase/firebaseConfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 const internshipList = {
   1: "Python Developer Internship",
@@ -19,13 +19,11 @@ function Dashboard({ darkMode }) {
 
   const [internships, setInternships] = useState([]);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-
-    const fetchUserAndInternships = async () => {
-
-      const currentUser = auth.currentUser;
+    const unsubs = auth.onAuthStateChanged(async (currentUser) => {
       if (!currentUser) {
         navigate("/login");
         return;
@@ -33,30 +31,53 @@ function Dashboard({ darkMode }) {
 
       setUser(currentUser);
 
-      const q = query(
-        collection(db, "enrollments"),
-        where("userId", "==", currentUser.uid)
-      );
+      try {
+        const q = query(
+          collection(db, "enrollments"),
+          where("userId", "==", currentUser.uid)
+        );
 
-      const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(q);
 
-      const data = [];
-      querySnapshot.forEach((doc) => {
-        data.push(doc.data());
-      });
+        const enrollmentsData = [];
+        await Promise.all(querySnapshot.docs.map(async (enrollDoc) => {
+          const e = enrollDoc.data();
+          let course = null;
+          try {
+            const courseDoc = await getDoc(doc(db, "courses", e.internshipId));
+            if (courseDoc.exists()) {
+              course = courseDoc.data();
+            }
+          } catch (_) {
+            course = null;
+          }
+          enrollmentsData.push({ id: enrollDoc.id, ...e, course });
+        }));
 
-      setInternships(data);
+        setInternships(enrollmentsData);
+      } catch (error) {
+        console.error("Dashboard load error:", error);
+        alert("Error loading dashboard data: " + (error.message || error));
+      } finally {
+        setLoading(false);
+      }
+    });
 
-    };
-
-    fetchUserAndInternships();
-
+    return () => unsubs();
   }, [navigate]);
 
   const handleLogout = async () => {
     await auth.signOut();
     navigate("/login");
   };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: darkMode ? '#1a1a2e' : '#f0f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+        Loading dashboard...
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -248,18 +269,20 @@ function Dashboard({ darkMode }) {
             gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
             gap: "30px"
           }}>
-            {internships.map((internship, index) => (
-              <div
-                key={index}
-                className="internship-card"
-                style={{
-                  background: "white",
-                  borderRadius: "15px",
-                  overflow: "hidden",
-                  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
-                  animationDelay: `${index * 0.1}s`
-                }}
-              >
+            {internships.map((internship, index) => {
+              const progress = Math.max(0, Math.min(100, Number(internship.progress ?? 0)));
+              return (
+                <div
+                  key={index}
+                  className="internship-card"
+                  style={{
+                    background: "white",
+                    borderRadius: "15px",
+                    overflow: "hidden",
+                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
+                    animationDelay: `${index * 0.1}s`
+                  }}
+                >
                 {/* Header */}
                 <div style={{
                   background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -271,14 +294,14 @@ function Dashboard({ darkMode }) {
                     fontSize: "40px",
                     marginBottom: "12px"
                   }}>
-                    {internshipIcons[internship.internshipId]}
+                    {internship.course?.icon || internshipIcons[internship.internshipId] || "📘"}
                   </div>
                   <h3 style={{
                     margin: "0",
                     fontSize: "18px",
                     fontWeight: "700"
                   }}>
-                    {internshipList[internship.internshipId]}
+                    {internship.course?.title || internshipList[internship.internshipId] || "Internship"}
                   </h3>
                 </div>
 
@@ -308,7 +331,7 @@ function Dashboard({ darkMode }) {
                         fontWeight: "800",
                         color: "#667eea"
                       }}>
-                        {internship.progress}%
+                        {progress}%
                       </span>
                     </div>
                     <div style={{
@@ -320,7 +343,7 @@ function Dashboard({ darkMode }) {
                       <div style={{
                         background: "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
                         height: "100%",
-                        width: `${internship.progress}%`,
+                        width: `${progress}%`,
                         transition: "width 0.5s ease",
                         borderRadius: "10px"
                       }} />
@@ -329,7 +352,7 @@ function Dashboard({ darkMode }) {
 
                   {/* Status Card */}
                   <div style={{
-                    background: internship.progress === 100 ? "#d4edda" : "#e7f3ff",
+                    background: progress === 100 ? "#d4edda" : "#e7f3ff",
                     borderRadius: "10px",
                     padding: "12px",
                     marginBottom: "20px",
@@ -338,10 +361,10 @@ function Dashboard({ darkMode }) {
                     <p style={{
                       margin: "0",
                       fontSize: "13px",
-                      color: internship.progress === 100 ? "#155724" : "#004085",
+                      color: progress === 100 ? "#155724" : "#004085",
                       fontWeight: "600"
                     }}>
-                      {internship.progress === 100 ? "✓ Completed" : "In Progress"}
+                      {progress === 100 ? "✓ Completed" : "In Progress"}
                     </p>
                   </div>
 
@@ -374,7 +397,8 @@ function Dashboard({ darkMode }) {
                   </Link>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

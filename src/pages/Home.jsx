@@ -1,12 +1,61 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { db } from "../firebase/firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
+
+const defaultInternships = [
+  {
+    id: "1",
+    title: "Python Developer Internship",
+    duration: "4 weeks",
+    price: 499,
+    icon: "🐍",
+    description: "Master Python programming and build real-world applications",
+    modules: [{ num: 1, title: "Python Basics", duration: "1 week", content: "Intro to Python, data types, control flow" }]
+  },
+  {
+    id: "2",
+    title: "Web Development Internship",
+    duration: "6 weeks",
+    price: 699,
+    icon: "🌐",
+    description: "Learn frontend and backend development with modern frameworks",
+    modules: [{ num: 1, title: "Frontend", duration: "2 weeks", content: "HTML, CSS, JavaScript" }]
+  },
+  {
+    id: "3",
+    title: "AI & Machine Learning Internship",
+    duration: "8 weeks",
+    price: 999,
+    icon: "🤖",
+    description: "Dive into AI, machine learning, and data science concepts",
+    modules: [{ num: 1, title: "ML Basics", duration: "2 weeks", content: "Supervised and unsupervised learning" }]
+  }
+];
 
 function Home({ darkMode }) {
+  const [internships, setInternships] = useState(defaultInternships);
 
-  const internships = [
-    { id: 1, title: "Python Developer Internship", duration: "4 weeks", price: "₹499", icon: "🐍", description: "Master Python programming and build real-world applications" },
-    { id: 2, title: "Web Development Internship", duration: "6 weeks", price: "₹699", icon: "🌐", description: "Learn frontend and backend development with modern frameworks" },
-    { id: 3, title: "AI & Machine Learning Internship", duration: "8 weeks", price: "₹999", icon: "🤖", description: "Dive into AI, machine learning, and data science concepts" }
-  ];
+  useEffect(() => {
+    const fetchInternships = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "courses"));
+        const items = [];
+        querySnapshot.forEach((doc) => items.push({ id: doc.id, ...doc.data() }));
+
+        if (items.length > 0) {
+          setInternships(items);
+        }
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+        alert("Unable to load internships from Firestore. Using defaults instead.");
+        setInternships(defaultInternships);
+      }
+    };
+
+    fetchInternships();
+  }, []);
+
 
   return (
     <div style={{

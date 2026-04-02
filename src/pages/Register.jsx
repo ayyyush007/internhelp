@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase/firebaseConfig";
 import { setDoc, doc } from "firebase/firestore";
 import { Link } from "react-router-dom";
 
 function Register({ darkMode }) {
+  const location = useLocation();
+  const referralCode = new URLSearchParams(location.search).get("ref") || "";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,10 +32,12 @@ function Register({ darkMode }) {
       // Save user data in Firestore
       await setDoc(doc(db, "users", user.uid), {
         name: name,
-        email: email
+        email: email,
+        referredBy: referralCode || null,
+        signupAt: new Date().toISOString()
       });
 
-      alert("User registered successfully!");
+      alert(`User registered successfully! ${referralCode ? "Thanks for using a referral code." : ""}`);
       setName("");
       setEmail("");
       setPassword("");

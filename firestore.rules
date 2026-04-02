@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Authenticated users can read their own profile record
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Show all courses to everybody (dev mode), manage only by admin
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null && request.auth.token.email == 'admin@internhelp.com';
+    }
+
+    // Enrollment can be created by user and read by the owner
+    match /enrollments/{enrollmentId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Referral data can be created/read by the referrer
+    match /referrals/{referralId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.referrerId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.referrerId;
+    }
+  }
+}
